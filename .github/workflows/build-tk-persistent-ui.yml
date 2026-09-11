@@ -12,17 +12,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Restore current Tk source
+        shell: pwsh
+        run: |
+          $b64 = (Get-Content '.buildsrc/source_part1.txt' -Raw).Trim() + 'IC' + (Get-Content '.buildsrc/source_part3.txt' -Raw).Trim() + (Get-Content '.buildsrc/source_part4.txt' -Raw).Trim()
+          [IO.File]::WriteAllBytes('jinlang_fahuo_push.py', [Convert]::FromBase64String($b64))
+          $hash = (Get-FileHash 'jinlang_fahuo_push.py' -Algorithm SHA256).Hash.ToLower()
+          Write-Host "source sha256=$hash"
+          if ($hash -ne '86831fedd02159ac5f2faaf78ed8b3a6224f3344754a35c524392e7104755577') { throw 'Source integrity check failed.' }
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install dependencies
         run: python -m pip install --upgrade pip pyinstaller openpyxl
+
+      - name: Validate source
+        run: python -m py_compile jinlang_fahuo_push.py
+
       - name: Build EXE
         run: pyinstaller --noconfirm --clean --onefile --windowed --name jinlang-office-fahuo-tk jinlang_fahuo_push.py
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jinlang-office-fahuo-tk-windows
+          name: jinlang-office-fahuo-tk-windows-history-forecast
           path: dist/jinlang-office-fahuo-tk.exe
           if-no-files-found: error
