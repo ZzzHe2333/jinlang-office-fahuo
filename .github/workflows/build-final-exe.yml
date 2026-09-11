@@ -1,0 +1,46 @@
+name: Build Final Windows EXE
+
+on:
+  push:
+    branches:
+      - build/final-exe-20260911-2144
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Reconstruct source
+        shell: python
+        run: |
+          import base64, lzma
+          from pathlib import Path
+          parts = [p.read_text(encoding='ascii').strip() for p in sorted(Path('build_src').glob('part*.txt'))]
+          payload = base64.b64decode(''.join(parts))
+          source = lzma.decompress(payload)
+          Path('jinlang_fahuo_push_tk.py').write_bytes(source)
+          print('reconstructed', len(source), 'bytes')
+
+      - name: Verify source
+        run: python -m py_compile jinlang_fahuo_push_tk.py
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pyinstaller openpyxl pillow
+
+      - name: Build EXE
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name jinlang-office-fahuo jinlang_fahuo_push_tk.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jinlang-office-fahuo-windows
+          path: dist/jinlang-office-fahuo.exe
+          if-no-files-found: error
