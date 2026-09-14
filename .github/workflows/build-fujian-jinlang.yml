@@ -1,0 +1,54 @@
+name: Build 福建锦浪发货预测 EXE
+
+on:
+  push:
+    branches:
+      - build/fujian-jinlang-exe-20260914
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restore source and icon
+        shell: powershell
+        run: |
+          $b64 = Get-Content -Raw build_payload.b64
+          [IO.File]::WriteAllBytes('build_payload.zip', [Convert]::FromBase64String($b64))
+          Expand-Archive -Path build_payload.zip -DestinationPath build_payload -Force
+          Copy-Item build_payload\jinlang_fahuo_push_tk.py .\jinlang_fahuo_push_tk.py -Force
+          Copy-Item build_payload\favicon.ico .\favicon.ico -Force
+
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller openpyxl pillow
+
+      - name: Syntax check
+        shell: powershell
+        run: |
+          python -m py_compile jinlang_fahuo_push_tk.py
+
+      - name: Build EXE
+        shell: powershell
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --icon favicon.ico --name "福建锦浪发货预测" jinlang_fahuo_push_tk.py
+          if (!(Test-Path "dist\福建锦浪发货预测.exe")) { throw "EXE build failed" }
+          Get-FileHash "dist\福建锦浪发货预测.exe" -Algorithm SHA256 | Format-List
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: fujian-jinlang-shipping-forecast-windows
+          path: dist/福建锦浪发货预测.exe
+          if-no-files-found: error
+          retention-days: 90
